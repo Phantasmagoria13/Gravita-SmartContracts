@@ -101,7 +101,7 @@ contract Timelock {
 		}
 		pendingAdmin = pendingAdmin_;
 
-		emit NewPendingAdmin(pendingAdmin);
+		emit NewPendingAdmin(pendingAdmin_);
 	}
 
 	function queueTransaction(
@@ -111,7 +111,7 @@ contract Timelock {
 		bytes memory data,
 		uint eta
 	) public adminOnly returns (bytes32) {
-		if (eta < block.timestamp + delay || eta > block.timestamp + delay + GRACE_PERIOD) {
+		if (eta < block.timestamp + delay) {
 			revert Timelock__ETAMustSatisfyDelay();
 		}
 

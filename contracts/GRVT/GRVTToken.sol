@@ -5,7 +5,7 @@ import "../Dependencies/ERC20Permit.sol";
 
 contract GRVTToken is ERC20Permit {
 
-	string public constant NAME = "GRVTToken";
+	bytes32 public constant NAME = "GRVTToken";
 
 	uint256 internal _1_MILLION = 1e24; // 1e6 * 1e18 = 1e24
 

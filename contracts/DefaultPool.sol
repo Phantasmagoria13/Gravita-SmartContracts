@@ -18,7 +18,7 @@ import "./Interfaces/IDefaultPool.sol";
 contract DefaultPool is OwnableUpgradeable, IDefaultPool {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
-	string public constant NAME = "DefaultPool";
+	bytes32 public constant NAME = "DefaultPool";
 
 	address public vesselManagerAddress;
 	address public activePoolAddress;
@@ -79,12 +79,12 @@ contract DefaultPool is OwnableUpgradeable, IDefaultPool {
 	// --- 'require' functions ---
 
 	modifier callerIsActivePool() {
-		require(msg.sender == activePoolAddress, "DefaultPool: Caller is not the ActivePool");
+		require(msg.sender == activePoolAddress, "Caller is not the ActivePool");
 		_;
 	}
 
 	modifier callerIsVesselManager() {
-		require(msg.sender == vesselManagerAddress, "DefaultPool: Caller is not the VesselManager");
+		require(msg.sender == vesselManagerAddress, "Caller is not the VesselManager");
 		_;
 	}
 

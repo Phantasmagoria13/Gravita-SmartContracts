@@ -11,7 +11,7 @@ import "./Interfaces/ICollSurplusPool.sol";
 contract CollSurplusPool is OwnableUpgradeable, ICollSurplusPool {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
-	string public constant NAME = "CollSurplusPool";
+	bytes32 public constant NAME = "CollSurplusPool";
 
 	address public activePoolAddress;
 	address public borrowerOperationsAddress;
@@ -71,12 +71,12 @@ contract CollSurplusPool is OwnableUpgradeable, ICollSurplusPool {
 
 		uint256 safetyTransferclaimableColl = SafetyTransfer.decimalsCorrection(_asset, claimableCollEther);
 
-		require(safetyTransferclaimableColl > 0, "CollSurplusPool: No collateral available to claim");
+		require(safetyTransferclaimableColl != 0, "No collateral available to claim");
 
 		userBalance[_asset] = 0;
 		emit CollBalanceUpdated(_account, 0);
 
-		balances[_asset] = balances[_asset] - claimableCollEther;
+		balances[_asset] -= claimableCollEther;
 		emit AssetSent(_account, safetyTransferclaimableColl);
 
 		IERC20Upgradeable(_asset).safeTransfer(_account, safetyTransferclaimableColl);
@@ -84,24 +84,24 @@ contract CollSurplusPool is OwnableUpgradeable, ICollSurplusPool {
 
 	function receivedERC20(address _asset, uint256 _amount) external override {
 		_requireCallerIsActivePool();
-		balances[_asset] = balances[_asset] + _amount;
+		balances[_asset] += _amount;
 	}
 
 	// --- 'require' functions ---
 
 	function _requireCallerIsBorrowerOperations() internal view {
-		require(msg.sender == borrowerOperationsAddress, "CollSurplusPool: Caller is not Borrower Operations");
+		require(msg.sender == borrowerOperationsAddress, "Caller is not BorrowerO");
 	}
 
 	function _requireCallerIsVesselManager() internal view {
 		require(
 			msg.sender == vesselManagerAddress || msg.sender == vesselManagerOperationsAddress,
-			"CollSurplusPool: Caller is not VesselManager"
+			"Caller is not VesselManager"
 		);
 	}
 
 	function _requireCallerIsActivePool() internal view {
-		require(msg.sender == activePoolAddress, "CollSurplusPool: Caller is not Active Pool");
+		require(msg.sender == activePoolAddress, "Caller is not Active Pool");
 	}
 
 }

@@ -17,7 +17,7 @@ import "./Dependencies/SafetyTransfer.sol";
 contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
-	string public constant NAME = "BorrowerOperations";
+	bytes32 public constant NAME = "BorrowerOperations";
 
 	// --- Connected contract declarations ---
 
@@ -36,10 +36,10 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 
 	struct LocalVariables_adjustVessel {
 		address asset;
+		bool isCollIncrease;
 		uint256 price;
 		uint256 collChange;
 		uint256 netDebtChange;
-		bool isCollIncrease;
 		uint256 debt;
 		uint256 coll;
 		uint256 oldICR;
@@ -147,7 +147,7 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 
 		// ICR is based on the composite debt, i.e. the requested debt token amount + borrowing fee + gas comp.
 		vars.compositeDebt = _getCompositeDebt(vars.asset, vars.netDebt);
-		assert(vars.compositeDebt > 0);
+		assert(vars.compositeDebt != 0);
 
 		vars.ICR = GravitaMath._computeCR(_assetAmount, vars.compositeDebt, vars.price);
 		vars.NICR = GravitaMath._computeNominalCR(_assetAmount, vars.compositeDebt);
@@ -297,7 +297,7 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 
 		// Confirm the operation is either a borrower adjusting their own vessel, or a pure asset transfer from the Stability Pool to a vessel
 		assert(
-			msg.sender == _borrower || (address(stabilityPool) == msg.sender && _assetSent > 0 && _debtTokenChange == 0)
+			msg.sender == _borrower || (address(stabilityPool) == msg.sender && _assetSent != 0 && _debtTokenChange == 0)
 		);
 
 		contractsCache.vesselManager.applyPendingRewards(vars.asset, _borrower);
@@ -338,7 +338,7 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 		_requireValidAdjustmentInCurrentMode(vars.asset, isRecoveryMode, _collWithdrawal, _isDebtIncrease, vars);
 
 		// When the adjustment is a debt repayment, check it's a valid amount and that the caller has enough debt tokens
-		if (!_isDebtIncrease && _debtTokenChange > 0) {
+		if (!_isDebtIncrease && _debtTokenChange != 0) {
 			_requireAtLeastMinNetDebt(vars.asset, _getNetDebt(vars.asset, vars.debt) - vars.netDebtChange);
 			_requireValidDebtTokenRepayment(vars.asset, vars.debt, vars.netDebtChange);
 			_requireSufficientDebtTokenBalance(contractsCache.debtToken, _borrower, vars.netDebtChange);
@@ -531,7 +531,7 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 		uint256 newTotalAssetDebt = _activePool.getDebtTokenBalance(_asset) +
 			adminContract.defaultPool().getDebtTokenBalance(_asset) +
 			_netDebtIncrease;
-		require(newTotalAssetDebt <= adminContract.getMintCap(_asset), "BorrowerOperations: Exceeds mint cap");
+		require(newTotalAssetDebt <= adminContract.getMintCap(_asset), "Exceeds mint cap");
 		_activePool.increaseDebt(_asset, _netDebtIncrease);
 		_debtToken.mint(_asset, _account, _debtTokenAmount);
 	}
@@ -551,7 +551,11 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 	// --- 'Require' wrapper functions ---
 
 	function _requireSingularCollChange(uint256 _collWithdrawal, uint256 _amountSent) internal pure {
-		require(_collWithdrawal == 0 || _amountSent == 0, "BorrowerOperations: Cannot withdraw and add coll");
+		require(_collWithdrawal == 0 || _amountSent == 0, "Cannot withdraw and add coll");
+	}
+
+	function _requireCallerIsBorrower(address _borrower) internal view {
+		require(msg.sender == _borrower, "!Borrower");
 	}
 
 	function _requireNonZeroAdjustment(
@@ -571,7 +575,7 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 		address _borrower
 	) internal view {
 		uint256 status = _vesselManager.getVesselStatus(_asset, _borrower);
-		require(status == 1, "BorrowerOps: Vessel does not exist or is closed");
+		require(status == 1, "Vessel does't exist or is closed");
 	}
 
 	function _requireVesselIsNotActive(
@@ -584,15 +588,15 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 	}
 
 	function _requireNonZeroDebtChange(uint256 _debtTokenChange) internal pure {
-		require(_debtTokenChange > 0, "BorrowerOps: Debt increase requires non-zero debtChange");
+		require(_debtTokenChange != 0, "Requires non-zero debtChange");
 	}
 
 	function _requireNotInRecoveryMode(address _asset, uint256 _price) internal view {
-		require(!_checkRecoveryMode(_asset, _price), "BorrowerOps: Operation not permitted during Recovery Mode");
+		require(!_checkRecoveryMode(_asset, _price), "Not permitted during RM");
 	}
 
 	function _requireNoCollWithdrawal(uint256 _collWithdrawal) internal pure {
-		require(_collWithdrawal == 0, "BorrowerOps: Collateral withdrawal not permitted Recovery Mode");
+		require(_collWithdrawal == 0, "Not during permitted RM");
 	}
 
 	function _requireValidAdjustmentInCurrentMode(
@@ -644,24 +648,24 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 	}
 
 	function _requireICRisAboveCCR(address _asset, uint256 _newICR) internal view {
-		require(_newICR >= adminContract.getCcr(_asset), "BorrowerOps: Operation must leave vessel with ICR >= CCR");
+		require(_newICR >= adminContract.getCcr(_asset), "Require ICR >= CCR");
 	}
 
 	function _requireNewICRisAboveOldICR(uint256 _newICR, uint256 _oldICR) internal pure {
-		require(_newICR >= _oldICR, "BorrowerOps: Cannot decrease your Vessel's ICR in Recovery Mode");
+		require(_newICR >= _oldICR, "Cannot decrease your ICR in RM");
 	}
 
 	function _requireNewTCRisAboveCCR(address _asset, uint256 _newTCR) internal view {
 		require(
 			_newTCR >= adminContract.getCcr(_asset),
-			"BorrowerOps: An operation that would result in TCR < CCR is not permitted"
+			"Not permitted"
 		);
 	}
 
 	function _requireAtLeastMinNetDebt(address _asset, uint256 _netDebt) internal view {
 		require(
 			_netDebt >= adminContract.getMinNetDebt(_asset),
-			"BorrowerOps: Vessel's net debt must be greater than minimum"
+			"Must be greater than minimum"
 		);
 	}
 
@@ -676,6 +680,10 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 		);
 	}
 
+	function _requireCallerIsStabilityPool() internal view {
+		require(address(stabilityPool) == msg.sender, "Caller is not Stability Pool");
+	}
+
 	function _requireSufficientDebtTokenBalance(
 		IDebtToken _debtToken,
 		address _borrower,
@@ -683,7 +691,7 @@ contract BorrowerOperations is GravitaBase, IBorrowerOperations {
 	) internal view {
 		require(
 			_debtToken.balanceOf(_borrower) >= _debtRepayment,
-			"BorrowerOps: Caller doesnt have enough debt tokens to make repayment"
+			"Not enough debt tokens"
 		);
 	}
 

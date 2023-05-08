@@ -8,6 +8,7 @@ import "./BaseMath.sol";
 import "./GravitaMath.sol";
 import "../Interfaces/IActivePool.sol";
 import "../Interfaces/IDefaultPool.sol";
+import "../Interfaces/IPriceFeed.sol";
 import "../Interfaces/IGravitaBase.sol";
 import "../Interfaces/IAdminContract.sol";
 
@@ -47,13 +48,13 @@ abstract contract GravitaBase is IGravitaBase, BaseMath, OwnableUpgradeable {
 	function getEntireSystemColl(address _asset) public view returns (uint256 entireSystemColl) {
 		uint256 activeColl = adminContract.activePool().getAssetBalance(_asset);
 		uint256 liquidatedColl = adminContract.defaultPool().getAssetBalance(_asset);
-		return activeColl + liquidatedColl;
+		entireSystemColl = activeColl + liquidatedColl;
 	}
 
 	function getEntireSystemDebt(address _asset) public view returns (uint256 entireSystemDebt) {
 		uint256 activeDebt = adminContract.activePool().getDebtTokenBalance(_asset);
 		uint256 closedDebt = adminContract.defaultPool().getDebtTokenBalance(_asset);
-		return activeDebt + closedDebt;
+		entireSystemDebt = activeDebt + closedDebt;
 	}
 
 	function _getTCR(address _asset, uint256 _price) internal view returns (uint256 TCR) {

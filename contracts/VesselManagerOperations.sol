@@ -9,10 +9,9 @@ import "./Interfaces/IVesselManager.sol";
 import "./Interfaces/IVesselManagerOperations.sol";
 
 contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
-	string public constant NAME = "VesselManagerOperations";
+	bytes32 public constant NAME = "VesselManagerOperations";
 	uint256 public constant REDEMPTION_SOFTENING_PARAM = 970; // 97%
 	uint256 public constant PERCENTAGE_PRECISION = 1000;
-	uint256 public constant BATCH_SIZE_LIMIT = 25;
 
 	// Structs ----------------------------------------------------------------------------------------------------------
 
@@ -127,7 +126,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 			totals.totalDebtToOffset,
 			totals.totalCollToSendToSP
 		);
-		if (totals.totalCollSurplus > 0) {
+		if (totals.totalCollSurplus != 0) {
 			contractsCache.activePool.sendAsset(_asset, address(collSurplusPool), totals.totalCollSurplus);
 		}
 
@@ -154,8 +153,8 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 	 * Attempt to liquidate a custom list of vessels provided by the caller.
 	 */
 	function batchLiquidateVessels(address _asset, address[] memory _vesselArray) public override {
-		if (_vesselArray.length == 0 || _vesselArray.length > BATCH_SIZE_LIMIT) {
-			revert VesselManagerOperations__InvalidArraySize();
+		if (_vesselArray.length == 0) {
+			revert VesselManagerOperations__CalldataEmptyArray();
 		}
 
 		IActivePool activePoolCached = adminContract.activePool();
@@ -185,7 +184,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 			totals.totalDebtToOffset,
 			totals.totalCollToSendToSP
 		);
-		if (totals.totalCollSurplus > 0) {
+		if (totals.totalCollSurplus != 0) {
 			activePoolCached.sendAsset(_asset, address(collSurplusPool), totals.totalCollSurplus);
 		}
 
@@ -454,7 +453,9 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 				diff = currentDiff;
 				hintAddress = currentAddress;
 			}
-			i++;
+			unchecked {
+				++i;	
+			}
 		}
 	}
 
@@ -480,13 +481,14 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 		vars.backToNormalMode = false;
 		vars.entireSystemDebt = getEntireSystemDebt(_asset);
 		vars.entireSystemColl = getEntireSystemColl(_asset);
+		uint len = _vesselArray.length;
 
-		for (vars.i = 0; vars.i < _vesselArray.length; ) {
+		for (vars.i = 0; vars.i < len; ) {
 			vars.user = _vesselArray[vars.i];
 			// Skip non-active vessels
 			if (vesselManager.getVesselStatus(_asset, vars.user) != uint256(IVesselManager.Status.active)) {
 				unchecked {
-					vars.i++;
+					++vars.i;
 				}
 				continue;
 			}
@@ -496,7 +498,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 				// Skip this vessel if ICR is greater than MCR and Stability Pool is empty
 				if (vars.ICR >= adminContract.getMcr(_asset) && vars.remainingDebtTokenInStabPool == 0) {
 					unchecked {
-						vars.i++;
+						++vars.i;
 					}
 					continue;
 				}
@@ -537,7 +539,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 				totals = _addLiquidationValuesToTotals(totals, singleLiquidation);
 			}
 			unchecked {
-				vars.i++;
+				++vars.i;
 			}
 		}
 	}
@@ -552,8 +554,9 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 		LiquidationValues memory singleLiquidation;
 
 		vars.remainingDebtTokenInStabPool = _debtTokenInStabPool;
+		uint len = _vesselArray.length;
 
-		for (vars.i = 0; vars.i < _vesselArray.length; ) {
+		for (vars.i = 0; vars.i < len; ) {
 			vars.user = _vesselArray[vars.i];
 			vars.ICR = vesselManager.getCurrentICR(_asset, vars.user, _price);
 
@@ -565,7 +568,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 				totals = _addLiquidationValuesToTotals(totals, singleLiquidation);
 			}
 			unchecked {
-				vars.i++;
+				++vars.i;
 			}
 		}
 	}
@@ -587,7 +590,6 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 		newTotals.totalDebtToRedistribute = oldTotals.totalDebtToRedistribute + singleLiquidation.debtToRedistribute;
 		newTotals.totalCollToRedistribute = oldTotals.totalCollToRedistribute + singleLiquidation.collToRedistribute;
 		newTotals.totalCollSurplus = oldTotals.totalCollSurplus + singleLiquidation.collSurplus;
-		return newTotals;
 	}
 
 	function _getTotalsFromLiquidateVesselsSequence_NormalMode(
@@ -615,7 +617,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 				totals = _addLiquidationValuesToTotals(totals, singleLiquidation);
 			} else break; // break if the loop reaches a Vessel with ICR >= MCR
 			unchecked {
-				vars.i++;
+				++vars.i;
 			}
 		}
 	}
@@ -656,7 +658,6 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 			singleLiquidation.entireVesselColl,
 			IVesselManager.VesselManagerOperation.liquidateInNormalMode
 		);
-		return singleLiquidation;
 	}
 
 	function _liquidateRecoveryMode(
@@ -751,7 +752,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 			);
 
 			vesselManagerCached.closeVesselLiquidation(_asset, _borrower);
-			if (singleLiquidation.collSurplus > 0) {
+			if (singleLiquidation.collSurplus != 0) {
 				collSurplusPool.accountSurplus(_asset, _borrower, singleLiquidation.collSurplus);
 			}
 			emit VesselLiquidated(
@@ -783,6 +784,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 	) internal returns (LiquidationTotals memory totals) {
 		LocalVariables_AssetBorrowerPrice memory assetVars = LocalVariables_AssetBorrowerPrice({
 			_asset: _asset,
+			_borrower: address(0),
 			_price: _price
 		});
 
@@ -848,7 +850,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 
 			vars.user = nextUser;
 			unchecked {
-				vars.i++;
+				++vars.i;
 			}
 		}
 	}
@@ -870,7 +872,7 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 			uint256 collToRedistribute
 		)
 	{
-		if (_debtTokenInStabPool > 0) {
+		if (_debtTokenInStabPool != 0) {
 			/*
 			 * Offset as much debt & collateral as possible against the Stability Pool, and redistribute the remainder
 			 * between all active vessels.
@@ -1012,7 +1014,5 @@ contract VesselManagerOperations is IVesselManagerOperations, GravitaBase {
 				_lowerPartialRedemptionHint
 			);
 		}
-
-		return singleRedemption;
 	}
 }

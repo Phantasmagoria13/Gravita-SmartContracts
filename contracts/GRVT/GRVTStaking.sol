@@ -17,7 +17,7 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
 	// --- Data ---
-	string public constant NAME = "GRVTStaking";
+	bytes32 public constant NAME = "GRVTStaking";
 	address constant ETH_REF_ADDRESS = address(0);
 
 	mapping(address => uint256) public stakes;
@@ -73,7 +73,7 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 
 	// If caller has a pre-existing stake, send any accumulated asset and debtToken gains to them.
 	function stake(uint256 _GRVTamount) external override nonReentrant whenNotPaused {
-		require(_GRVTamount > 0);
+		require(_GRVTamount != 0);
 
 		uint256 currentStake = stakes[msg.sender];
 
@@ -81,7 +81,7 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 		uint256 assetGain;
 		address asset;
 
-		for (uint256 i = 0; i < assetLength; i++) {
+		for (uint256 i; i < assetLength;) {
 			asset = ASSET_TYPE[i];
 
 			if (currentStake != 0) {
@@ -98,6 +98,10 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 			}
 
 			_updateUserSnapshots(asset, msg.sender);
+
+			unchecked {
+				++i;
+			}
 		}
 
 		uint256 newStake = currentStake + _GRVTamount;
@@ -123,7 +127,7 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 		uint256 assetGain;
 		address asset;
 
-		for (uint256 i = 0; i < assetLength; i++) {
+		for (uint256 i; i < assetLength;) {
 			asset = ASSET_TYPE[i];
 
 			// Grab any accumulated asset and debtToken gains from the current stake
@@ -138,9 +142,13 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 			_updateUserSnapshots(asset, msg.sender);
 			emit StakingGainsAssetWithdrawn(msg.sender, asset, assetGain);
 			_sendAssetGainToUser(asset, assetGain);
+
+			unchecked {
+				++i;
+			}
 		}
 
-		if (_GRVTamount > 0) {
+		if (_GRVTamount != 0) {
 			uint256 GRVTToWithdraw = GravitaMath._min(_GRVTamount, currentStake);
 			uint256 newStake = currentStake - GRVTToWithdraw;
 
@@ -183,11 +191,11 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 
 		uint256 assetFeePerGRVTStaked;
 
-		if (totalGRVTStaked > 0) {
+		if (totalGRVTStaked != 0) {
 			assetFeePerGRVTStaked = _assetFee * DECIMAL_PRECISION / totalGRVTStaked;
 		}
 
-		F_ASSETS[_asset] = F_ASSETS[_asset] + assetFeePerGRVTStaked;
+		F_ASSETS[_asset] += assetFeePerGRVTStaked;
 		emit Fee_AssetUpdated(_asset, F_ASSETS[_asset]);
 	}
 
@@ -198,7 +206,7 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 		}
 
 		uint256 feePerGRVTStaked;
-		if (totalGRVTStaked > 0) {
+		if (totalGRVTStaked != 0) {
 			feePerGRVTStaked = _debtTokenFee * DECIMAL_PRECISION / totalGRVTStaked;
 		}
 
@@ -258,16 +266,16 @@ contract GRVTStaking is IGRVTStaking, PausableUpgradeable, OwnableUpgradeable, B
 	// --- 'require' functions ---
 
 	modifier callerIsVesselManager() {
-		require(msg.sender == vesselManagerAddress, "GRVTStaking: caller is not VesselManager");
+		require(msg.sender == vesselManagerAddress, "Caller is not VesselManager");
 		_;
 	}
 
 	modifier callerIsFeeCollector() {
-		require(msg.sender == feeCollectorAddress, "GRVTStaking: caller is not FeeCollector");
+		require(msg.sender == feeCollectorAddress, "Caller is not FeeCollector");
 		_;
 	}
 
 	function _requireUserHasStake(uint256 currentStake) internal pure {
-		require(currentStake > 0, "GRVTStaking: User must have a non-zero stake");
+		require(currentStake != 0, "User must have a non-zero stake");
 	}
 }

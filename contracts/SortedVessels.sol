@@ -39,9 +39,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
  *
  * - Public functions with parameters have been made internal to save gas, and given an external wrapper function for external access
  */
-contract SortedVessels is OwnableUpgradeable, ISortedVessels { 
+contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 
-	string public constant NAME = "SortedVessels";
+	bytes32 public constant NAME = "SortedVessels";
 
 	address public borrowerOperationsAddress;
 
@@ -58,6 +58,7 @@ contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 	struct Data {
 		address head; // Head of the list. Also the node in the list with the largest NICR
 		address tail; // Tail of the list. Also the node in the list with the smallest NICR
+		uint256 maxSize; // Maximum size of the list
 		uint256 size; // Current size of the list
 		// Depositor address => node
 		mapping(address => Node) nodes; // Track the corresponding ids for each node in the list
@@ -105,11 +106,11 @@ contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 		Data storage assetData = data[_asset];
 
 		// List must not already contain node
-		require(!_contains(assetData, _id), "SortedVessels: List already contains the node");
+		require(!_contains(assetData, _id), "List already contains the node");
 		// Node id must not be null
-		require(_id != address(0), "SortedVessels: Id cannot be zero");
+		require(_id != address(0), "Id cannot be zero");
 		// NICR must be non-zero
-		require(_NICR > 0, "SortedVessels: NICR must be positive");
+		require(_NICR != 0, "NICR must be positive");
 
 		address prevId = _prevId;
 		address nextId = _nextId;
@@ -162,7 +163,7 @@ contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 		Data storage assetData = data[_asset];
 		
 		// List must contain the node
-		require(_contains(assetData, _id), "SortedVessels: List does not contain the id");
+		require(_contains(assetData, _id), "List does not contain the id");
 		
 		Node storage node = assetData.nodes[_id];
 		if (assetData.size > 1) {
@@ -216,9 +217,9 @@ contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 
 		_requireCallerIsBOorVesselM(vesselManagerCached);
 		// List must contain the node
-		require(contains(_asset, _id), "SortedVessels: List does not contain the id");
+		require(contains(_asset, _id), "List does not contain the id");
 		// NICR must be non-zero
-		require(_newNICR > 0, "SortedVessels: NICR must be positive");
+		require(_newNICR != 0, "NICR must be positive");
 
 		// Remove node from the list
 		_remove(_asset, _id);
@@ -238,6 +239,13 @@ contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 	}
 
 	/*
+	 * @dev Checks if the list is full
+	 */
+	function isFull(address _asset) public view override returns (bool) {
+		return data[_asset].size == data[_asset].maxSize;
+	}
+
+	/*
 	 * @dev Checks if the list is empty
 	 */
 	function isEmpty(address _asset) public view override returns (bool) {
@@ -249,6 +257,13 @@ contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 	 */
 	function getSize(address _asset) external view override returns (uint256) {
 		return data[_asset].size;
+	}
+
+	/*
+	 * @dev Returns the maximum size of the list
+	 */
+	function getMaxSize(address _asset) external view override returns (uint256) {
+		return data[_asset].maxSize;
 	}
 
 	/*
@@ -440,13 +455,13 @@ contract SortedVessels is OwnableUpgradeable, ISortedVessels {
 	// --- 'require' functions ---
 
 	function _requireCallerIsVesselManager() internal view {
-		require(msg.sender == address(vesselManager), "SortedVessels: Caller is not the VesselManager");
+		require(msg.sender == address(vesselManager), "Caller is not the VesselManager");
 	}
 
 	function _requireCallerIsBOorVesselM(IVesselManager _vesselManager) internal view {
 		require(
 			msg.sender == borrowerOperationsAddress || msg.sender == address(_vesselManager),
-			"SortedVessels: Caller is neither BO nor VesselM"
+			"Caller is neither BO nor VesselM"
 		);
 	}
 }

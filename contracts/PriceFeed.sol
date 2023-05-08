@@ -10,9 +10,10 @@ import "./Dependencies/GravitaMath.sol";
 import "./Interfaces/IPriceFeed.sol";
 
 contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
+
 	/** Constants ---------------------------------------------------------------------------------------------------- */
 
-	string public constant NAME = "PriceFeed";
+	bytes32 public constant NAME = "PriceFeed";
 
 	// Used to convert a chainlink price answer to an 18-digit precision uint
 	uint256 public constant TARGET_DIGITS = 18;
@@ -32,9 +33,21 @@ contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
 	mapping(address => OracleRecord) public oracleRecords;
 	mapping(address => PriceRecord) public priceRecords;
 
+	/** Modifiers ---------------------------------------------------------------------------------------------------- */
+
+	modifier onlyTimelock() {
+		if (msg.sender != timelockAddress) {
+			revert PriceFeed__TimelockOnly();
+		}
+		_;
+	}
+
 	/** Initializer -------------------------------------------------------------------------------------------------- */
 
-	function setAddresses(address _adminContractAddress, address _timelockAddress) external initializer {
+	function setAddresses(
+		address _adminContractAddress,
+		address _timelockAddress
+	) external initializer {
 		__Ownable_init();
 		timelockAddress = _timelockAddress;
 		adminContractAddress = _adminContractAddress;
@@ -47,14 +60,7 @@ contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
 		address _chainlinkOracle,
 		uint256 _maxDeviationBetweenRounds,
 		bool _isEthIndexed
-	) external override {
-		OracleRecord storage oracle = oracleRecords[_token];
-		if (!oracle.exists) {
-			_checkOwner(); // Owner can set an oracle for the first time
-		} else {
-			_checkTimelock(); // Subsequent updates need to go through the timelock contract
-		}
-
+	) external override onlyTimelock {
 		if (
 			_maxDeviationBetweenRounds < MAX_PRICE_DEVIATION_BETWEEN_ROUNDS_LOWER_LIMIT ||
 			_maxDeviationBetweenRounds > MAX_PRICE_DEVIATION_BETWEEN_ROUNDS_UPPER_LIMIT
@@ -143,7 +149,7 @@ contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
 
 	function _calcEthPrice(uint256 ethAmount) internal returns (uint256) {
 		uint256 ethPrice = fetchPrice(address(0));
-		return (ethPrice * ethAmount) / 1 ether;
+		return ethPrice * ethAmount / 1 ether;
 	}
 
 	function _fetchFeedResponses(AggregatorV3Interface oracle)
@@ -170,10 +176,10 @@ contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
 	function _isValidResponse(FeedResponse memory _response) internal view returns (bool) {
 		return
 			(_response.success) &&
-			(_response.roundId > 0) &&
-			(_response.timestamp > 0) &&
+			(_response.roundId != 0) &&
+			(_response.timestamp != 0) &&
 			(_response.timestamp <= block.timestamp) &&
-			(_response.answer > 0);
+			(_response.answer != 0);
 	}
 
 	function _isPriceChangeAboveMaxDeviation(
@@ -192,7 +198,7 @@ contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
 		 * - If price decreased, the percentage deviation is in relation to the previous price.
 		 * - If price increased, the percentage deviation is in relation to the current price.
 		 */
-		uint256 percentDeviation = ((maxPrice - minPrice) * DECIMAL_PRECISION) / maxPrice;
+		uint256 percentDeviation = (maxPrice - minPrice) * DECIMAL_PRECISION / maxPrice;
 
 		return percentDeviation > _maxDeviationBetweenRounds;
 	}
@@ -235,8 +241,7 @@ contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
 			response.decimals = decimals;
 		} catch {
 			// If call to Chainlink aggregator reverts, return a zero response with success = false
-			return response;
-		}
+			return response;}
 		try _priceAggregator.latestRoundData() returns (
 			uint80 roundId,
 			int256 answer,
@@ -279,11 +284,4 @@ contract PriceFeed is IPriceFeed, OwnableUpgradeable, BaseMath {
 			} catch {}
 		}
 	}
-
-	function _checkTimelock() internal view {
-		if (msg.sender != timelockAddress) {
-			revert PriceFeed__TimelockOnly();
-		}
-	}
 }
-

@@ -11,7 +11,7 @@ contract VesselManager is IVesselManager, GravitaBase {
 
 	// Constants ------------------------------------------------------------------------------------------------------
 
-	string public constant NAME = "VesselManager";
+	bytes32 public constant NAME = "VesselManager";
 
 	uint256 public constant SECONDS_IN_ONE_MINUTE = 60;
 	/*
@@ -272,7 +272,6 @@ contract VesselManager is IVesselManager, GravitaBase {
 		assetOwners.push(_borrower);
 		index = assetOwners.length - 1;
 		Vessels[_borrower][_asset].arrayIndex = uint128(index);
-		return index;
 	}
 
 	function executeFullRedemption(
@@ -340,7 +339,7 @@ contract VesselManager is IVesselManager, GravitaBase {
 		uint256 redeemedDebtFraction = _assetDrawn * _price / _totalDebtTokenSupply;
 		uint256 newBaseRate = decayedBaseRate + (redeemedDebtFraction / BETA);
 		newBaseRate = GravitaMath._min(newBaseRate, DECIMAL_PRECISION);
-		assert(newBaseRate > 0);
+		assert(newBaseRate != 0);
 		baseRate[_asset] = newBaseRate;
 		emit BaseRateUpdated(_asset, newBaseRate);
 		_updateLastFeeOpTime(_asset);
@@ -465,10 +464,10 @@ contract VesselManager is IVesselManager, GravitaBase {
 		uint256 _debtTokenAmount,
 		uint256 _assetAmount
 	) external onlyVesselManagerOperations {
-		if (_debtTokenAmount > 0) {
+		if (_debtTokenAmount != 0) {
 			debtToken.returnFromPool(gasPoolAddress, _liquidator, _debtTokenAmount);
 		}
-		if (_assetAmount > 0) {
+		if (_assetAmount != 0) {
 			adminContract.activePool().sendAsset(_asset, _liquidator, _assetAmount);
 		}
 	}
@@ -750,7 +749,7 @@ contract VesselManager is IVesselManager, GravitaBase {
 		uint256 paybackFraction = (_debtDecrease * 1 ether) / oldDebt;
 		uint256 newDebt = oldDebt - _debtDecrease;
 		vessel.debt = newDebt;
-		if (paybackFraction > 0) {
+		if (paybackFraction != 0) {
 			feeCollector.decreaseDebt(_borrower, _asset, paybackFraction);
 		}
 		return newDebt;

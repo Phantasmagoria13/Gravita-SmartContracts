@@ -30,9 +30,13 @@ interface ISortedVessels {
 
 	function contains(address _asset, address _id) external view returns (bool);
 
+	function isFull(address _asset) external view returns (bool);
+
 	function isEmpty(address _asset) external view returns (bool);
 
 	function getSize(address _asset) external view returns (uint256);
+
+	function getMaxSize(address _asset) external view returns (uint256);
 
 	function getFirst(address _asset) external view returns (address);
 

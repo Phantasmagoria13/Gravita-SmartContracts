@@ -21,9 +21,9 @@ interface IPriceFeed {
 	}
 
 	struct FeedResponse {
-		uint80 roundId;
 		int256 answer;
 		uint256 timestamp;
+		uint80 roundId;
 		bool success;
 		uint8 decimals;
 	}

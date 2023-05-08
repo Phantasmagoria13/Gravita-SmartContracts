@@ -20,7 +20,7 @@ contract LockedGRVT is Ownable, Initializable {
 		uint256 claimed;
 	}
 
-	string public constant NAME = "LockedGRVT";
+	bytes32 public constant NAME = "LockedGRVT";
 	uint256 public constant SIX_MONTHS = 26 weeks;
 	uint256 public constant TWO_YEARS = 730 days;
 
@@ -30,7 +30,7 @@ contract LockedGRVT is Ownable, Initializable {
 	mapping(address => Rule) public entitiesVesting;
 
 	modifier entityRuleExists(address _entity) {
-		require(entitiesVesting[_entity].createdDate != 0, "Entity doesn't have a Vesting Rule");
+		require(entitiesVesting[_entity].createdDate != 0, "Doesn't have a Vesting Rule");
 		_;
 	}
 
@@ -41,9 +41,9 @@ contract LockedGRVT is Ownable, Initializable {
 	function addEntityVesting(address _entity, uint256 _totalSupply) public onlyOwner {
 		require(address(0) != _entity, "Invalid Address");
 
-		require(entitiesVesting[_entity].createdDate == 0, "Entity already has a Vesting Rule");
+		require(entitiesVesting[_entity].createdDate == 0, "Already has a Vesting Rule");
 
-		assignedGRVTTokens += _totalSupply;
+		assignedGRVTTokens = assignedGRVTTokens + _totalSupply;
 
 		entitiesVesting[_entity] = Rule(
 			block.timestamp,
@@ -110,8 +110,6 @@ contract LockedGRVT is Ownable, Initializable {
 				((entityRule.totalSupply / TWO_YEARS) * (block.timestamp - entityRule.createdDate)) -
 				entityRule.claimed;
 		}
-
-		return claimable;
 	}
 
 	function getUnassignGRVTTokensAmount() public view returns (uint256) {

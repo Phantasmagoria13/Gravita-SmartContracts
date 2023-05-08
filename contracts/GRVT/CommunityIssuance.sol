@@ -14,7 +14,7 @@ import "../Interfaces/IStabilityPool.sol";
 contract CommunityIssuance is ICommunityIssuance, OwnableUpgradeable, BaseMath {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
-	string public constant NAME = "CommunityIssuance";
+	bytes32 public constant NAME = "CommunityIssuance";
 	uint256 public constant DISTRIBUTION_DURATION = 7 days / 60;
 	uint256 public constant SECONDS_IN_ONE_MINUTE = 60;
 
@@ -22,10 +22,10 @@ contract CommunityIssuance is ICommunityIssuance, OwnableUpgradeable, BaseMath {
 	IStabilityPool public stabilityPool;
 
 	uint256 public totalGRVTIssued;
-	uint256 public lastUpdateTime;
 	uint256 public GRVTSupplyCap;
 	uint256 public grvtDistribution;
 
+	uint64 public lastUpdateTime;
 	address public adminContract;
 
 	modifier isController() {
@@ -34,12 +34,12 @@ contract CommunityIssuance is ICommunityIssuance, OwnableUpgradeable, BaseMath {
 	}
 
 	modifier isStabilityPool(address _pool) {
-		require(address(stabilityPool) == _pool, "CommunityIssuance: caller is not SP");
+		require(address(stabilityPool) == _pool, "Caller is not SP");
 		_;
 	}
 
 	modifier onlyStabilityPool() {
-		require(address(stabilityPool) == msg.sender, "CommunityIssuance: caller is not SP");
+		require(address(stabilityPool) == msg.sender, "Caller is not SP");
 		_;
 	}
 
@@ -71,7 +71,7 @@ contract CommunityIssuance is ICommunityIssuance, OwnableUpgradeable, BaseMath {
 			"CommunityIssuance: Stability Pool doesn't have enough supply."
 		);
 
-		GRVTSupplyCap -= _fundToRemove;
+		GRVTSupplyCap = GRVTSupplyCap - _fundToRemove;
 
 		grvtToken.safeTransfer(msg.sender, _fundToRemove);
 	}
@@ -86,10 +86,10 @@ contract CommunityIssuance is ICommunityIssuance, OwnableUpgradeable, BaseMath {
 
 	function _addFundToStabilityPoolFrom(uint256 _assignedSupply, address _spender) internal {
 		if (lastUpdateTime == 0) {
-			lastUpdateTime = block.timestamp;
+			lastUpdateTime = uint64(block.timestamp);
 		}
 
-		GRVTSupplyCap += _assignedSupply;
+		GRVTSupplyCap = GRVTSupplyCap + _assignedSupply;
 		grvtToken.safeTransferFrom(_spender, address(this), _assignedSupply);
 	}
 
@@ -106,7 +106,7 @@ contract CommunityIssuance is ICommunityIssuance, OwnableUpgradeable, BaseMath {
 			totalIssuance = maxPoolSupply;
 		}
 
-		lastUpdateTime = block.timestamp;
+		lastUpdateTime = uint64(block.timestamp);
 		totalGRVTIssued = totalIssuance;
 		emit TotalGRVTIssuedUpdated(totalIssuance);
 
@@ -114,7 +114,7 @@ contract CommunityIssuance is ICommunityIssuance, OwnableUpgradeable, BaseMath {
 	}
 
 	function _getLastUpdateTokenDistribution() internal view returns (uint256) {
-		require(lastUpdateTime != 0, "Stability pool hasn't been assigned");
+		require(lastUpdateTime != 0, "StabilityP hasn't been assigned");
 		uint256 timePassed = (block.timestamp - lastUpdateTime) / SECONDS_IN_ONE_MINUTE;
 		uint256 totalDistribuedSinceBeginning = grvtDistribution * timePassed;
 

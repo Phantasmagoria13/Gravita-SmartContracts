@@ -117,8 +117,8 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 		address _asset,
 		uint256 _paybackFraction
 	) external view override returns (uint256) {
-		require(_paybackFraction <= 1 ether, "Payback fraction cannot be higher than 1 (@ 10**18)");
-		require(_paybackFraction > 0, "Payback fraction cannot be zero");
+		require(_paybackFraction <= 1 ether, "Cannot be higher than 1");
+		require(_paybackFraction != 0, "Payback fraction cannot be zero");
 		FeeRecord memory mRecord = feeRecords[_borrower][_asset];
 		if (mRecord.amount == 0 || mRecord.to < block.timestamp) {
 			return 0;
@@ -139,7 +139,7 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 	 */
 	function liquidateDebt(address _borrower, address _asset) external override onlyVesselManager {
 		FeeRecord memory mRecord = feeRecords[_borrower][_asset];
-		if (mRecord.amount > 0) {
+		if (mRecord.amount != 0) {
 			_closeExpiredOrLiquidatedFeeRecord(_borrower, _asset, mRecord.amount);
 		}
 	}
@@ -153,20 +153,21 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 			revert FeeCollector__ArrayMismatch();
 		}
 		uint256 NOW = block.timestamp;
-		for (uint256 i = 0; i < borrowersLength; ) {
+		for (uint256 i; i < borrowersLength; ) {
 			address borrower = _borrowers[i];
 			address asset = _assets[i];
 			FeeRecord storage sRecord = feeRecords[borrower][asset];
 			uint256 expiredAmount = _calcExpiredAmount(sRecord.from, sRecord.to, sRecord.amount);
-			if (expiredAmount > 0) {
-				uint256 updatedAmount = sRecord.amount - expiredAmount;
-				sRecord.amount = updatedAmount;
-				sRecord.from = NOW;
-				_collectFee(borrower, asset, expiredAmount);
-				emit FeeRecordUpdated(borrower, asset, NOW, sRecord.to, updatedAmount);
+			if (expiredAmount == 0) {
+				continue;
 			}
+			uint256 updatedAmount = sRecord.amount - expiredAmount;
+			sRecord.amount = updatedAmount;
+			sRecord.from = NOW;
+			_collectFee(borrower, asset, expiredAmount);
+			emit FeeRecordUpdated(borrower, asset, NOW, sRecord.to, updatedAmount);
 			unchecked {
-				i++;
+				++i;
 			}
 		}
 	}
@@ -175,7 +176,7 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 	 * Triggered by VesselManager.finalizeRedemption(); assumes _amount of _asset has been moved here from ActivePool.
 	 */
 	function handleRedemptionFee(address _asset, uint256 _amount) external onlyVesselManager {
-		if (_amount > 0) {
+		if (_amount != 0) {
 			address collector = routeToGRVTStaking ? address(grvtStaking) : treasuryAddress;
 			IERC20Upgradeable(_asset).safeTransfer(collector, _amount);
 			if (routeToGRVTStaking) {
@@ -187,10 +188,14 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 
 	/** Helper & internal methods ------------------------------------------------------------------------------------ */
 
-	function _decreaseDebt(address _borrower, address _asset, uint256 _paybackFraction) internal {
+	function _decreaseDebt(
+		address _borrower,
+		address _asset,
+		uint256 _paybackFraction
+	) internal {
 		uint256 NOW = block.timestamp;
-		require(_paybackFraction <= 1 ether, "Payback fraction cannot be higher than 1 (@ 10**18)");
-		require(_paybackFraction > 0, "Payback fraction cannot be zero");
+		require(_paybackFraction <= 1 ether, "Cannot be higher than 1");
+		require(_paybackFraction != 0, "Payback fraction cannot be zero");
 		FeeRecord storage sRecord = feeRecords[_borrower][_asset];
 		if (sRecord.amount == 0) {
 			return;
@@ -274,13 +279,21 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 		return expiredAmount;
 	}
 
-	function _closeExpiredOrLiquidatedFeeRecord(address _borrower, address _asset, uint256 _amount) internal {
+	function _closeExpiredOrLiquidatedFeeRecord(
+		address _borrower,
+		address _asset,
+		uint256 _amount
+	) internal {
 		_collectFee(_borrower, _asset, _amount);
 		delete feeRecords[_borrower][_asset];
 		emit FeeRecordUpdated(_borrower, _asset, block.timestamp, 0, 0);
 	}
 
-	function _calcExpiredAmount(uint256 _from, uint256 _to, uint256 _amount) internal view returns (uint256) {
+	function _calcExpiredAmount(
+		uint256 _from,
+		uint256 _to,
+		uint256 _amount
+	) internal view returns (uint256) {
 		uint256 NOW = block.timestamp;
 		if (_from > NOW) {
 			return 0;
@@ -310,8 +323,12 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 	/**
 	 * Transfers collected (debt token) fees to either the treasury or the GRVTStaking contract, depending on a flag.
 	 */
-	function _collectFee(address _borrower, address _asset, uint256 _feeAmount) internal {
-		if (_feeAmount > 0) {
+	function _collectFee(
+		address _borrower,
+		address _asset,
+		uint256 _feeAmount
+	) internal {
+		if (_feeAmount != 0) {
 			address collector = routeToGRVTStaking ? address(grvtStaking) : treasuryAddress;
 			IERC20Upgradeable(debtTokenAddress).safeTransfer(collector, _feeAmount);
 			if (routeToGRVTStaking) {
@@ -321,8 +338,12 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 		}
 	}
 
-	function _refundFee(address _borrower, address _asset, uint256 _refundAmount) internal {
-		if (_refundAmount > 0) {
+	function _refundFee(
+		address _borrower,
+		address _asset,
+		uint256 _refundAmount
+	) internal {
+		if (_refundAmount != 0) {
 			IERC20Upgradeable(debtTokenAddress).safeTransfer(_borrower, _refundAmount);
 			emit FeeRefunded(_borrower, _asset, _refundAmount);
 		}
@@ -355,3 +376,4 @@ contract FeeCollector is IFeeCollector, OwnableUpgradeable {
 		_;
 	}
 }
+

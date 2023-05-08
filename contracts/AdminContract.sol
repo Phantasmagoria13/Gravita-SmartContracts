@@ -15,7 +15,7 @@ import "./Interfaces/IAdminContract.sol";
 contract AdminContract is IAdminContract, ProxyAdmin {
 	// Constants --------------------------------------------------------------------------------------------------------
 
-	string public constant NAME = "AdminContract";
+	bytes32 public constant NAME = "AdminContract";
 	uint256 public constant DECIMAL_PRECISION = 1 ether;
 	uint256 public constant _100pct = 1 ether; // 1e18 == 100%
 	uint256 public constant REDEMPTION_BLOCK_DAYS = 14;
@@ -144,7 +144,7 @@ contract AdminContract is IAdminContract, ProxyAdmin {
 	) external longTimelockOnly {
 		require(collateralParams[_collateral].mcr == 0, "collateral already exists");
 		// for the moment, require collaterals to have 18 decimals
-		require(_decimals == DEFAULT_DECIMALS, "collaterals must have the default decimals");
+		require(_decimals == DEFAULT_DECIMALS, "!default decimals");
 		validCollateral.push(_collateral);
 		collateralParams[_collateral] = CollateralParams({
 			decimals: _decimals,
@@ -175,11 +175,12 @@ contract AdminContract is IAdminContract, ProxyAdmin {
 	}
 
 	function isWrappedMany(address[] calldata _collaterals) external view returns (bool[] memory wrapped) {
-		wrapped = new bool[](_collaterals.length);
-		for (uint256 i = 0; i < _collaterals.length; ) {
+		uint len = _collaterals.length;
+		wrapped = new bool[](len);
+		for (uint256 i; i < len; ) {
 			wrapped[i] = collateralParams[_collaterals[i]].isWrapped;
 			unchecked {
-				i++;
+				++i;
 			}
 		}
 	}
@@ -208,7 +209,7 @@ contract AdminContract is IAdminContract, ProxyAdmin {
 			_exists(_colls[i]);
 			indices[i] = collateralParams[_colls[i]].index;
 			unchecked {
-				i++;
+				++i;
 			}
 		}
 	}

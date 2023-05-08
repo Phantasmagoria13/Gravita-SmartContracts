@@ -23,7 +23,7 @@ import "./Interfaces/IStabilityPool.sol";
 contract ActivePool is OwnableUpgradeable, ReentrancyGuardUpgradeable, IActivePool {
 	using SafeERC20Upgradeable for IERC20Upgradeable;
 
-	string public constant NAME = "ActivePool";
+	bytes32 public constant NAME = "ActivePool";
 
 	address public borrowerOperationsAddress;
 	address public stabilityPoolAddress;
